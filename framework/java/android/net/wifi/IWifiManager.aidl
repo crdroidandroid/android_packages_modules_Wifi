@@ -40,6 +40,7 @@ import android.net.wifi.IScanResultsCallback;
 import android.net.wifi.ISoftApCallback;
 import android.net.wifi.ISubsystemRestartCallback;
 import android.net.wifi.ISuggestionConnectionStatusListener;
+import android.net.wifi.IStaStateCallback;
 import android.net.wifi.ISuggestionUserApprovalStatusListener;
 import android.net.wifi.ITrafficStateCallback;
 import android.net.wifi.IWifiConnectedNetworkScorer;
@@ -375,6 +376,7 @@ interface IWifiManager
 
     List<WifiAvailableChannel> getUsableChannels(int band, int mode, int filter);
 
+<<<<<<< HEAD
     boolean isWifiPasspointEnabled();
 
     void setWifiPasspointEnabled(boolean enabled);
@@ -398,4 +400,9 @@ interface IWifiManager
     void removeCustomDhcpOptions(in WifiSsid ssid, in byte[] oui);
 
     void reportCreateInterfaceImpact(String packageName, int interfaceType, boolean requireNewInterface, in IInterfaceCreationInfoCallback callback);
+
+    void registerStaStateCallback(in IBinder binder, in IStaStateCallback callback, int callbackIdentifier);
+
+    void unregisterStaStateCallback(int callbackIdentifier);
+
 }
