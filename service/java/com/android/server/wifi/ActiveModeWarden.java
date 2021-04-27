@@ -2104,4 +2104,7 @@ public class ActiveModeWarden {
     private static <T> T coalesce(T a, T  b) {
         return a != null ? a : b;
     }
+
+    public void registerStaEventCallback() {}
+    public void unregisterStaEventCallback() {}
 }
