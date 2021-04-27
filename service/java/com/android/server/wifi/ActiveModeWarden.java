@@ -2326,4 +2326,7 @@ public class ActiveModeWarden {
         return Objects.equals(ssid, connectedOrConnectingSsid)
                 && Objects.equals(bssid, connectedOrConnectingBssid);
     }
+
+    public void registerStaEventCallback() {}
+    public void unregisterStaEventCallback() {}
 }
