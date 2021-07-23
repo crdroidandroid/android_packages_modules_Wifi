@@ -38,6 +38,7 @@ import android.net.wifi.WifiManager;
 import android.net.wifi.WifiManager.DeviceMobilityState;
 import android.net.wifi.WifiNetworkSuggestion;
 import android.net.wifi.WifiScanner;
+import android.net.wifi.p2p.WifiP2pManager;
 import android.net.wifi.WifiScanner.PnoSettings;
 import android.net.wifi.WifiScanner.ScanSettings;
 import android.net.wifi.hotspot2.PasspointConfiguration;
@@ -172,6 +173,8 @@ public class WifiConnectivityManager {
     private boolean mAutoJoinEnabled = false; // disabled by default, enabled by external triggers
     private boolean mRunning = false;
     private boolean mScreenOn = false;
+    private int mMiracastMode = WifiP2pManager.MIRACAST_DISABLED;
+    private boolean mP2pGroupStarted = false;
     private int mWifiState = WIFI_STATE_UNKNOWN;
     private int mInitialScanState = INITIAL_SCAN_STATE_COMPLETE;
     private boolean mAutoJoinEnabledExternal = true; // enabled by default
@@ -1786,6 +1789,17 @@ public class WifiConnectivityManager {
 
     // Start a single scan
     private void startForcedSingleScan(boolean isFullBandScan, WorkSource workSource) {
+        // Any scans will impact wifi performance including WFD performance,
+        // So at least ignore scans triggered internally by ConnectivityManager
+        // when WFD session is active. We still allow connectivity scans initiated
+        // by other work source.
+        if (WIFI_WORK_SOURCE.equals(workSource) && mP2pGroupStarted &&
+            (mMiracastMode == WifiP2pManager.MIRACAST_SOURCE ||
+            mMiracastMode == WifiP2pManager.MIRACAST_SINK)) {
+            Log.d(TAG, "ignore connectivity scan, MiracastMode: " + mMiracastMode);
+            return;
+        }
+
         mPnoScanListener.resetLowRssiNetworkRetryDelay();
 
         ScanSettings settings = new ScanSettings();
@@ -2128,6 +2142,23 @@ public class WifiConnectivityManager {
         mOpenNetworkNotifier.handleScreenStateChanged(screenOn);
 
         startConnectivityScan(SCAN_ON_SCHEDULE);
+    }
+
+    /**
+     * Save current miracast mode, it will be used to ignore
+     * connectivity scan during the time when miracast is enabled.
+     */
+    public void saveMiracastMode(int mode) {
+        Log.d(TAG, "saveMiracastMode: mode=" + mode);
+        mMiracastMode = mode;
+    }
+
+    /**
+     * Save current p2p group started or not.
+     */
+    public void saveP2pGroupStarted(boolean started) {
+        Log.d(TAG, "saveP2pGroupStarted: started=" + started);
+        mP2pGroupStarted = started;
     }
 
     /**
@@ -2525,7 +2556,10 @@ public class WifiConnectivityManager {
             if (mWifiGlobals.flushAnqpCacheOnWifiToggleOffEvent()) {
                 mPasspointManager.clearAnqpRequestsAndFlushCache();
             }
+            saveMiracastMode(WifiP2pManager.MIRACAST_DISABLED);
+            saveP2pGroupStarted(false);
         }
+
         mWifiEnabled = enable;
         updateRunningState();
     }

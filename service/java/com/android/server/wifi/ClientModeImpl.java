@@ -3809,7 +3809,18 @@ public class ClientModeImpl extends StateMachine implements ClientMode {
                             WifiDiagnostics.CONNECTION_EVENT_TIMEOUT, mClientModeManager);
                     break;
                 }
+                case WifiP2pServiceImpl.SET_MIRACAST_MODE:
+                    if (mVerboseLoggingEnabled) logd("SET_MIRACAST_MODE: " + (int)message.arg1);
+                    mWifiConnectivityManager.saveMiracastMode((int)message.arg1);
+                    break;
                 case WifiP2pServiceImpl.P2P_CONNECTION_CHANGED:
+                    NetworkInfo info = (NetworkInfo) message.obj;
+                    if (info != null) {
+                        NetworkInfo.DetailedState detailedState = info.getDetailedState();
+                        mWifiConnectivityManager.saveP2pGroupStarted(
+                                detailedState == NetworkInfo.DetailedState.CONNECTED);
+                    }
+                    break;
                 case CMD_RESET_SIM_NETWORKS:
                 case WifiMonitor.NETWORK_CONNECTION_EVENT:
                 case WifiMonitor.NETWORK_DISCONNECTION_EVENT:
