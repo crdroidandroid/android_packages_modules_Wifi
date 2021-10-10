@@ -376,7 +376,6 @@ interface IWifiManager
 
     List<WifiAvailableChannel> getUsableChannels(int band, int mode, int filter);
 
-<<<<<<< HEAD
     boolean isWifiPasspointEnabled();
 
     void setWifiPasspointEnabled(boolean enabled);
@@ -404,5 +403,4 @@ interface IWifiManager
     void registerStaStateCallback(in IBinder binder, in IStaStateCallback callback, int callbackIdentifier);
 
     void unregisterStaStateCallback(int callbackIdentifier);
-
 }

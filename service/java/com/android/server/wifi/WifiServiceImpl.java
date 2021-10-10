@@ -276,6 +276,7 @@ public class WifiServiceImpl extends BaseWifiService {
     private final MultiInternetManager mMultiInternetManager;
     private int mVerboseAlwaysOnLevel = -1;
     private boolean mIsWifiServiceStarted = false;
+    private boolean mVerboseLoggingEnabled = false;
 
     /**
      * Callback for use with LocalOnlyHotspot to unregister requesting applications upon death.
