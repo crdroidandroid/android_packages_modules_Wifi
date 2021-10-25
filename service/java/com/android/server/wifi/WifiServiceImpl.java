@@ -63,6 +63,8 @@ import android.annotation.AnyThread;
 import android.annotation.CheckResult;
 import android.annotation.NonNull;
 import android.annotation.Nullable;
+import android.app.AlarmManager;
+import android.app.AlarmManager.OnAlarmListener;
 import android.app.AppOpsManager;
 import android.app.admin.DevicePolicyManager;
 import android.app.admin.WifiSsidPolicy;
@@ -79,6 +81,7 @@ import android.content.pm.PackageInfo;
 import android.content.pm.PackageManager;
 import android.content.pm.ResolveInfo;
 import android.content.res.Resources;
+import android.database.ContentObserver;
 import android.hardware.wifi.WifiStatusCode;
 import android.location.LocationManager;
 import android.net.DhcpInfo;
@@ -164,6 +167,7 @@ import android.os.PowerManager;
 import android.os.Process;
 import android.os.RemoteCallbackList;
 import android.os.RemoteException;
+import android.os.SystemClock;
 import android.os.UserHandle;
 import android.os.UserManager;
 import android.os.WorkSource;
@@ -250,6 +254,9 @@ public class WifiServiceImpl extends BaseWifiService {
     static final int AUTO_DISABLE_SHOW_KEY_COUNTDOWN_MILLIS = 24 * 60 * 60 * 1000;
     private static final int CHANNEL_USAGE_WEAK_SCAN_RSSI_DBM = -80;
 
+    // Settings.Global.WIFI_OFF_TIMEOUT
+    private static final String WIFI_OFF_TIMEOUT = "wifi_off_timeout";
+
     private final ActiveModeWarden mActiveModeWarden;
     private final ScanRequestProxy mScanRequestProxy;
 
@@ -303,6 +310,16 @@ public class WifiServiceImpl extends BaseWifiService {
     private final BuildProperties mBuildProperties;
 
     private final DefaultClientModeManager mDefaultClientModeManager;
+
+    private final OnAlarmListener mWifiTimeoutListener = new OnAlarmListener() {
+        @Override
+        public void onAlarm() {
+            if (getWifiEnabledState() == WifiManager.WIFI_STATE_ENABLED
+                    && getCurrentNetwork() == null) {
+                setWifiEnabled(mContext.getPackageName(), false);
+            }
+        }
+    };
 
     @VisibleForTesting
     public final CountryCodeTracker mCountryCodeTracker;
@@ -774,6 +791,8 @@ public class WifiServiceImpl extends BaseWifiService {
             intentFilter.addAction(BluetoothAdapter.ACTION_STATE_CHANGED);
             intentFilter.addAction(PowerManager.ACTION_DEVICE_IDLE_MODE_CHANGED);
             intentFilter.addAction(Intent.ACTION_SHUTDOWN);
+            intentFilter.addAction(WifiManager.NETWORK_STATE_CHANGED_ACTION);
+            intentFilter.addAction(WifiManager.WIFI_STATE_CHANGED_ACTION);
             mContext.registerReceiver(
                     new BroadcastReceiver() {
                         @Override
@@ -815,6 +834,9 @@ public class WifiServiceImpl extends BaseWifiService {
                                 handleIdleModeChanged();
                             } else if (Intent.ACTION_SHUTDOWN.equals(action)) {
                                 handleShutDown();
+                            } else if (action.equals(WifiManager.NETWORK_STATE_CHANGED_ACTION) ||
+                                    action.equals(WifiManager.WIFI_STATE_CHANGED_ACTION)) {
+                                setWifiTimeout();
                             }
                         }
                     },
@@ -840,6 +862,17 @@ public class WifiServiceImpl extends BaseWifiService {
             mWifiInjector.getPasspointManager().handleBootCompleted();
             mWifiInjector.getInterfaceConflictManager().handleBootCompleted();
             mWifiInjector.getHalDeviceManager().handleBootCompleted();
+            mContext.getContentResolver().registerContentObserver(
+                    Settings.Global.getUriFor(WIFI_OFF_TIMEOUT),
+                    false,
+                    new ContentObserver(new Handler(mContext.getMainLooper())) {
+                        @Override
+                        public void onChange(boolean selfChange) {
+                            super.onChange(selfChange);
+                            setWifiTimeout();
+                        }
+                    }
+            );
             // HW capabilities is ready after boot completion.
             if (!mWifiGlobals.isInsecureEnterpriseConfigurationAllowed()) {
                 mWifiConfigManager.updateTrustOnFirstUseFlag(isTrustOnFirstUseSupported());
@@ -865,6 +898,18 @@ public class WifiServiceImpl extends BaseWifiService {
     public void handleUserStop(int userId) {
         Log.d(TAG, "Handle user stop " + userId);
         mWifiThreadRunner.post(() -> mWifiConfigManager.handleUserStop(userId));
+    }
+
+    private void setWifiTimeout() {
+        long wifiTimeoutMillis = Settings.Global.getLong(mContext.getContentResolver(),
+                WIFI_OFF_TIMEOUT, 0);
+        AlarmManager alarmManager = mContext.getSystemService(AlarmManager.class);
+        alarmManager.cancel(mWifiTimeoutListener);
+        if (wifiTimeoutMillis != 0) {
+            final long timeout = SystemClock.elapsedRealtime() + wifiTimeoutMillis;
+            alarmManager.setExactAndAllowWhileIdle(AlarmManager.ELAPSED_REALTIME_WAKEUP, timeout,
+                    TAG, new Handler(mContext.getMainLooper()), mWifiTimeoutListener);
+        }
     }
 
     /**
