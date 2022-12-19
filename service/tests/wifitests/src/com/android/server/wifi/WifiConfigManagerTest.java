@@ -2515,45 +2515,48 @@ public class WifiConfigManagerTest extends WifiBaseTest {
     }
 
     /**
-     * Verify that when non-persistent MAC randomization is enabled the MAC address changes after 24
-     * hours of the first connection this MAC address is used.
+     * Verify that when non-persistent MAC randomization is enabled the MAC address changes after
+     * the maximum refresh time has elapsed since the first connection this MAC address is used.
      */
-    private void testNonPersistentMacRandomizationEvery24Hours(boolean isForSecondaryDbs) {
+    private void testNonPersistentMacRandomizationAfterMaxRefreshTime(boolean isForSecondaryDbs) {
         setUpWifiConfigurationForNonPersistentRandomization();
         WifiConfiguration config = getFirstInternalWifiConfiguration();
+        final long maxRefreshTime = WifiConfigManager.NON_PERSISTENT_MAC_REFRESH_MS_MAX;
+        final int testSlices = 24;
+        final long testPeriod = maxRefreshTime / testSlices;
 
         assertEquals(TEST_WALLCLOCK_CREATION_TIME_MILLIS, config.randomizedMacLastModifiedTimeMs);
         MacAddress firstMac = config.getRandomizedMacAddress();
-        for (int i = 0; i < 24; i++) {
+        for (int i = 0; i < testSlices; i++) {
             when(mClock.getWallClockMillis()).thenReturn(TEST_WALLCLOCK_CREATION_TIME_MILLIS
-                    + i * 60 * 60 * 1000);
+                    + i * testPeriod);
             mWifiConfigManager.updateNetworkAfterDisconnect(config.networkId);
-            assertEquals("Randomized MAC should be the same after " + i + " hours",
+            assertEquals("Randomized MAC should be the same after " + i * testPeriod + " ms",
                     isForSecondaryDbs ? MacAddressUtil.nextMacAddress(firstMac) : firstMac,
                     mWifiConfigManager.getRandomizedMacAndUpdateIfNeeded(config,
                             isForSecondaryDbs));
             config = getFirstInternalWifiConfiguration();
         }
 
-        // verify that after 24 hours the randomized MAC address changes.
-        long timeAfter24Hours = TEST_WALLCLOCK_CREATION_TIME_MILLIS + 24 * 60 * 60 * 1000;
-        when(mClock.getWallClockMillis()).thenReturn(timeAfter24Hours);
+        // verify that after the max refresh time the randomized MAC address changes.
+        long timeAfterMaxRefresh = TEST_WALLCLOCK_CREATION_TIME_MILLIS + maxRefreshTime;
+        when(mClock.getWallClockMillis()).thenReturn(timeAfterMaxRefresh);
         assertNotEquals(firstMac,
                 mWifiConfigManager.getRandomizedMacAndUpdateIfNeeded(config, isForSecondaryDbs));
         config = getFirstInternalWifiConfiguration();
-        assertEquals(timeAfter24Hours, config.randomizedMacLastModifiedTimeMs);
+        assertEquals(timeAfterMaxRefresh, config.randomizedMacLastModifiedTimeMs);
     }
 
     /* For Non Dbs network configuration */
     @Test
-    public void testNonPersistentMacRandomizationEvery24HoursNonDbs() {
-        testNonPersistentMacRandomizationEvery24Hours(false);
+    public void testNonPersistentMacRandomizationAfterMaxRefreshTimeNonDbs() {
+        testNonPersistentMacRandomizationAfterMaxRefreshTime(false);
     }
 
     /* For Dbs network configuration */
     @Test
-    public void testNonPersistentMacRandomizationEvery24HoursDbs() {
-        testNonPersistentMacRandomizationEvery24Hours(true);
+    public void testNonPersistentMacRandomizationAfterMaxRefreshTimeDbs() {
+        testNonPersistentMacRandomizationAfterMaxRefreshTime(true);
     }
 
     /**
