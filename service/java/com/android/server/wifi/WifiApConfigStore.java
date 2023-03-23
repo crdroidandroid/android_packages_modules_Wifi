@@ -161,13 +161,10 @@ public class WifiApConfigStore {
      * and the main Wifi thread (CMD_START_AP).
      */
     public synchronized void setApConfiguration(SoftApConfiguration config) {
-        if (config == null) {
-            config = getDefaultApConfiguration();
-        } else {
-            config = sanitizePersistentApConfig(config);
-        }
-        persistConfigAndTriggerBackupManagerProxy(
-                new SoftApConfiguration.Builder(config).setUserConfiguration(true).build());
+        SoftApConfiguration newConfig = config == null ? getDefaultApConfiguration()
+                : new SoftApConfiguration.Builder(sanitizePersistentApConfig(config))
+                        .setUserConfiguration(true).build();
+        persistConfigAndTriggerBackupManagerProxy(newConfig);
     }
 
     /**

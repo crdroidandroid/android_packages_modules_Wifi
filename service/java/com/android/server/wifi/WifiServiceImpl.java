@@ -4093,18 +4093,12 @@ public class WifiServiceImpl extends BaseWifiService {
             return;
         }
         // Delete all Wifi SSIDs
-        mWifiThreadRunner.run(() -> {
-            List<WifiConfiguration> networks = mWifiConfigManager
-                    .getSavedNetworks(Process.WIFI_UID);
-            EventLog.writeEvent(0x534e4554, "231985227", -1,
-                    "Remove certs for factory reset");
-            for (WifiConfiguration network : networks) {
-                if (network.isEnterprise()) {
-                    mWifiInjector.getWifiKeyStore().removeKeys(network.enterpriseConfig, true);
-                }
-                removeNetwork(network.networkId, packageName);
-            }
-        });
+        List<WifiConfiguration> networks = mWifiThreadRunner.call(
+                () -> mWifiConfigManager.getSavedNetworks(Process.WIFI_UID),
+                Collections.emptyList());
+        for (WifiConfiguration network : networks) {
+            removeNetwork(network.networkId, packageName);
+        }
         // Delete all Passpoint configurations
         List<PasspointConfiguration> configs = mWifiThreadRunner.call(
                 () -> mPasspointManager.getProviderConfigs(Process.WIFI_UID /* ignored */, true),
@@ -4113,6 +4107,9 @@ public class WifiServiceImpl extends BaseWifiService {
             removePasspointConfigurationInternal(null, config.getUniqueId());
         }
         mWifiThreadRunner.post(() -> {
+            EventLog.writeEvent(0x534e4554, "241927115", -1,
+                    "Reset SoftApConfiguration to default configuration");
+            mWifiApConfigStore.setApConfiguration(null);
             mPasspointManager.clearAnqpRequestsAndFlushCache();
             mWifiConfigManager.clearUserTemporarilyDisabledList();
             mWifiConfigManager.removeAllEphemeralOrPasspointConfiguredNetworks();
