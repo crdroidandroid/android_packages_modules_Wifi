@@ -1772,9 +1772,6 @@ public class WifiInfo implements TransportInfo, Parcelable {
             // is redundant. Don't allow anyone to use this.
             throw new UnsupportedOperationException();
         }
-        if (mIsPrimary == IS_PRIMARY_NO_PERMISSION) {
-            throw new SecurityException("Not allowed to access this field");
-        }
         return mIsPrimary == IS_PRIMARY_TRUE;
     }
 
