@@ -908,7 +908,8 @@ public class WifiServiceImpl extends BaseWifiService {
         if (wifiTimeoutMillis != 0) {
             final long timeout = SystemClock.elapsedRealtime() + wifiTimeoutMillis;
             alarmManager.setExactAndAllowWhileIdle(AlarmManager.ELAPSED_REALTIME_WAKEUP, timeout,
-                    TAG, new Handler(mContext.getMainLooper()), mWifiTimeoutListener);
+                    TAG, new HandlerExecutor(new Handler(mContext.getMainLooper())), null,
+                    mWifiTimeoutListener);
         }
     }
 
