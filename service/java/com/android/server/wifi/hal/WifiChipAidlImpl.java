@@ -1095,7 +1095,7 @@ public class WifiChipAidlImpl implements IWifiChip {
         return switch (Build.DEVICE) {
             // There's an MTE Wi-Fi HAL crash on 8th and 9th gen Pixel devices that is triggered by
             // debug ring buffer logging
-            case "shiba", "husky", "akita", "tokay", "caiman", "komodo", "comet" -> true;
+            case "shiba", "husky", "akita", "tokay", "caiman", "komodo", "comet", "tegu" -> true;
             default -> false;
         };
     }
