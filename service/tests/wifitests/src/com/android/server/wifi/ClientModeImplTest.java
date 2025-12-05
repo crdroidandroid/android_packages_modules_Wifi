@@ -1188,6 +1188,25 @@ public class ClientModeImplTest extends WifiBaseTest {
     }
 
     /**
+     * Verify that a failed connect attempt to a PSK network triggers wrong password handling.
+     */
+    @Test
+    public void triggerConnectFailureWithPskTriggersWrongPasswordHandling() throws Exception {
+        WifiConfiguration config = WifiConfigurationTestUtil.createPskNetwork();
+        config.networkId = FRAMEWORK_NETWORK_ID;
+        when(mWifiNative.connectToNetwork(eq(WIFI_IFACE_NAME), eq(config))).thenReturn(false);
+
+        setupAndStartConnectSequence(config);
+
+        verify(mWifiDiagnostics).triggerBugReportDataCapture(
+                WifiDiagnostics.REPORT_REASON_AUTH_FAILURE);
+        verify(mWrongPasswordNotifier).onWrongPasswordError(config);
+        verify(mWifiConfigManager).updateNetworkSelectionStatus(eq(config.networkId),
+                eq(WifiConfiguration.NetworkSelectionStatus
+                        .DISABLED_BY_WRONG_PASSWORD));
+    }
+
+    /**
      * Tests the entire successful network connection flow.
      */
     @Test

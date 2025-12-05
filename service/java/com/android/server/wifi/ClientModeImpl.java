@@ -4637,10 +4637,24 @@ public class ClientModeImpl extends StateMachine implements ClientMode {
             loge("CMD_START_CONNECT Failed to start connection to network " + config);
             mTargetWifiConfiguration = null;
             stopIpClient();
-            reportConnectionAttemptEnd(
-                    WifiMetrics.ConnectionEvent.FAILURE_CONNECT_NETWORK_FAILED,
-                    WifiMetricsProto.ConnectionEvent.HLF_NONE,
-                    WifiMetricsProto.ConnectionEvent.FAILURE_REASON_UNKNOWN, 0);
+            if (config != null && config.isSecurityType(WifiConfiguration.SECURITY_TYPE_PSK)) {
+                mWifiDiagnostics.triggerBugReportDataCapture(
+                        WifiDiagnostics.REPORT_REASON_AUTH_FAILURE);
+                mWrongPasswordNotifier.onWrongPasswordError(config);
+                mWifiConfigManager.updateNetworkSelectionStatus(
+                        mTargetNetworkId, WifiConfiguration.NetworkSelectionStatus
+                                .DISABLED_BY_WRONG_PASSWORD);
+                mWifiConfigManager.clearRecentFailureReason(mTargetNetworkId);
+                reportConnectionAttemptEnd(
+                        WifiMetrics.ConnectionEvent.FAILURE_AUTHENTICATION_FAILURE,
+                        WifiMetricsProto.ConnectionEvent.HLF_NONE,
+                        WifiMetricsProto.ConnectionEvent.AUTH_FAILURE_WRONG_PSWD, -1);
+            } else {
+                reportConnectionAttemptEnd(
+                        WifiMetrics.ConnectionEvent.FAILURE_CONNECT_NETWORK_FAILED,
+                        WifiMetricsProto.ConnectionEvent.HLF_NONE,
+                        WifiMetricsProto.ConnectionEvent.FAILURE_REASON_UNKNOWN, 0);
+            }
         }
     }
 
