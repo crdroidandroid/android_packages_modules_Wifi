@@ -3429,7 +3429,10 @@ public class WifiServiceImpl extends IWifiManager.Stub {
                 return LocalOnlyHotspotCallback.ERROR_INCOMPATIBLE_MODE;
             }
             // check if we are currently tethering
-            if (!mActiveModeWarden.canRequestMoreSoftApManagers(requestorWs)
+            // Prevent deadlock when driver continuously fails
+            boolean canRequestMoreSoftApManagers = mWifiThreadRunner.call(
+                () -> mActiveModeWarden.canRequestMoreSoftApManagers(requestorWs), false);
+            if (!canRequestMoreSoftApManagers
                     && mTetheredSoftApTracker.getState().getState() == WIFI_AP_STATE_ENABLED) {
                 // Tethering is enabled, cannot start LocalOnlyHotspot
                 mLog.info("Cannot start localOnlyHotspot when WiFi Tethering is active.")
