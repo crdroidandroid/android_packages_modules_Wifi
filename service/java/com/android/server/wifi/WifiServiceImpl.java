@@ -7771,11 +7771,26 @@ public class WifiServiceImpl extends IWifiManager.Stub {
                         .flush();
                 return;
             }
+            boolean isConnectedToForgottenNetwork = false;
+            boolean hasOtherConnection = false;
+            for (ClientModeManager cmm : mActiveModeWarden.getClientModeManagers()) {
+                WifiConfiguration connectedConfig = cmm.getConnectedWifiConfiguration();
+                if (connectedConfig != null && connectedConfig.networkId == netId) {
+                    isConnectedToForgottenNetwork = true;
+                } else if (cmm.isConnected()) {
+                    hasOtherConnection = true;
+                }
+            }
             boolean success = mWifiConfigManager.removeNetwork(netId, uid, null);
             ActionListenerWrapper wrapper = new ActionListenerWrapper(callback);
             if (success) {
                 wrapper.sendSuccess();
                 broadcastWifiCredentialChanged(WifiManager.WIFI_CREDENTIAL_FORGOT, config);
+                if (isConnectedToForgottenNetwork && !hasOtherConnection) {
+                    Log.d(TAG, "Forgot connected network, clearing user temporarily"
+                            + " disabled list to allow auto-connect");
+                    mWifiConfigManager.clearUserTemporarilyDisabledList();
+                }
             } else {
                 Log.e(TAG, "Failed to remove network");
                 wrapper.sendFailure(WifiManager.ActionListener.FAILURE_INTERNAL_ERROR);
