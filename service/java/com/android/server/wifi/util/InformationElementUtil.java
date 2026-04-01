@@ -2875,7 +2875,9 @@ public class InformationElementUtil {
                 char letter3 = (char) (data.get() & Constants.BYTE_MASK);
                 // See 802.11 spec dot11CountryString definition.
                 // ' ', 'O', 'I' are for all operation, outdoor, indoor environments, respectively.
-                mValid = (letter3 == ' ' || letter3 == 'O' || letter3 == 'I')
+                // or a value 1–6 indicating an operating class table.
+                mValid = (letter3 == ' ' || letter3 == 'O' || letter3 == 'I'
+                        || (letter3 >= 0x01 && letter3 <= 0x06))
                         && Character.isLetterOrDigit((int) letter1)
                         && Character.isLetterOrDigit((int) letter2);
                 if (mValid) {
