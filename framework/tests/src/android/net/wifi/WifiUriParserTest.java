@@ -176,7 +176,9 @@ public class WifiUriParserTest {
         expectedSecurityParamsList =
                 ImmutableList.of(
                         SecurityParams.createSecurityParamsBySecurityType(
-                                WifiConfiguration.SECURITY_TYPE_PSK));
+                                WifiConfiguration.SECURITY_TYPE_PSK),
+                        SecurityParams.createSecurityParamsBySecurityType(
+                                WifiConfiguration.SECURITY_TYPE_SAE));
         uri = WifiUriParser.parseUri("WIFI:S:another one;T:WPA;P:3#=3j9 asicla");
         verifyZxParsing(
                 uri,
@@ -237,7 +239,9 @@ public class WifiUriParserTest {
         expectedSecurityParamsList =
                 ImmutableList.of(
                         SecurityParams.createSecurityParamsBySecurityType(
-                                WifiConfiguration.SECURITY_TYPE_PSK));
+                                WifiConfiguration.SECURITY_TYPE_PSK),
+                        SecurityParams.createSecurityParamsBySecurityType(
+                                WifiConfiguration.SECURITY_TYPE_SAE));
         uri = WifiUriParser.parseUri("WIFI:S:anotherone;T:WPA;R:0;P:3#=3j9asicla");
         verifyZxParsing(
                 uri,
@@ -246,14 +250,75 @@ public class WifiUriParserTest {
                 "\"3#=3j9asicla\"",
                 false);
 
-        SecurityParams pskButDisableed = SecurityParams.createSecurityParamsBySecurityType(
-                                WifiConfiguration.SECURITY_TYPE_PSK);
-        pskButDisableed.setEnabled(false);
         expectedSecurityParamsList =
-                ImmutableList.of(pskButDisableed,
+                ImmutableList.of(
                         SecurityParams.createSecurityParamsBySecurityType(
                                 WifiConfiguration.SECURITY_TYPE_SAE));
         uri = WifiUriParser.parseUri("WIFI:S:anotherone;T:WPA;R:1;P:3#=3j9asicla");
+        verifyZxParsing(
+                uri,
+                "\"anotherone\"",
+                expectedSecurityParamsList,
+                "\"3#=3j9asicla\"",
+                false);
+
+        expectedSecurityParamsList =
+                ImmutableList.of(
+                        SecurityParams.createSecurityParamsBySecurityType(
+                                WifiConfiguration.SECURITY_TYPE_PSK),
+                        SecurityParams.createSecurityParamsBySecurityType(
+                                WifiConfiguration.SECURITY_TYPE_SAE));
+        uri = WifiUriParser.parseUri("WIFI:S:wpa3transition;T:WPA;R:8;P:3#=3j9asicla");
+        verifyZxParsing(
+                uri,
+                "\"wpa3transition\"",
+                expectedSecurityParamsList,
+                "\"3#=3j9asicla\"",
+                false);
+
+        expectedSecurityParamsList =
+                ImmutableList.of(
+                        SecurityParams.createSecurityParamsBySecurityType(
+                                WifiConfiguration.SECURITY_TYPE_OWE));
+        uri = WifiUriParser.parseUri("WIFI:S:oweonly;T:nopass;R:8");
+        verifyZxParsing(
+                uri,
+                "\"oweonly\"",
+                expectedSecurityParamsList,
+                null,
+                false);
+
+        expectedSecurityParamsList =
+                ImmutableList.of(
+                        SecurityParams.createSecurityParamsBySecurityType(
+                                WifiConfiguration.SECURITY_TYPE_OWE));
+        uri = WifiUriParser.parseUri("WIFI:S:oweonly;T:nopass;R:F");
+        verifyZxParsing(
+                uri,
+                "\"oweonly\"",
+                expectedSecurityParamsList,
+                null,
+                false);
+
+        expectedSecurityParamsList =
+                ImmutableList.of(
+                        SecurityParams.createSecurityParamsBySecurityType(
+                                WifiConfiguration.SECURITY_TYPE_OPEN),
+                        SecurityParams.createSecurityParamsBySecurityType(
+                                WifiConfiguration.SECURITY_TYPE_OWE));
+        uri = WifiUriParser.parseUri("WIFI:S:owe-transition;T:nopass;R:7");
+        verifyZxParsing(
+                uri,
+                "\"owe-transition\"",
+                expectedSecurityParamsList,
+                null,
+                false);
+
+        final SecurityParams saePkOnlyParams = SecurityParams.createSecurityParamsBySecurityType(
+                WifiConfiguration.SECURITY_TYPE_SAE);
+        saePkOnlyParams.enableSaePkOnlyMode(true);
+        expectedSecurityParamsList = ImmutableList.of(saePkOnlyParams);
+        uri = WifiUriParser.parseUri("WIFI:S:anotherone;T:WPA;R:3;P:3#=3j9asicla;K:dummyPublicKey");
         verifyZxParsing(
                 uri,
                 "\"anotherone\"",

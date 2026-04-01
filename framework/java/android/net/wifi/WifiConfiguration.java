@@ -572,6 +572,12 @@ public class WifiConfiguration implements Parcelable {
 
     private void updateLegacySecurityParams() {
         if (mSecurityParamsList.isEmpty()) return;
+        for (SecurityParams p : mSecurityParamsList) {
+            if (p.isEnabled()) {
+                p.updateLegacyWifiConfiguration(this);
+                return;
+            }
+        }
         mSecurityParamsList.get(0).updateLegacyWifiConfiguration(this);
     }
 
@@ -896,6 +902,37 @@ public class WifiConfiguration implements Parcelable {
     public boolean isSecurityType(@SecurityType int securityType) {
         for (SecurityParams p : mSecurityParamsList) {
             if (p.isSecurityType(securityType)) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    /**
+     * Indicate whether this configuration is the specific security type enabled.
+     *
+     * @param securityType One of the following security types:
+     * {@link #SECURITY_TYPE_OPEN},
+     * {@link #SECURITY_TYPE_WEP},
+     * {@link #SECURITY_TYPE_PSK},
+     * {@link #SECURITY_TYPE_EAP},
+     * {@link #SECURITY_TYPE_SAE},
+     * {@link #SECURITY_TYPE_OWE},
+     * {@link #SECURITY_TYPE_WAPI_PSK},
+     * {@link #SECURITY_TYPE_WAPI_CERT},
+     * {@link #SECURITY_TYPE_EAP_WPA3_ENTERPRISE},
+     * {@link #SECURITY_TYPE_EAP_WPA3_ENTERPRISE_192_BIT},
+     * {@link #SECURITY_TYPE_DPP},
+     *
+     * @return true if there is a security params matches the type and it's enabled.
+     * @see #isSecurityType(int)
+     * @see #setSecurityParamsEnabled(int, boolean)
+     * @hide
+     */
+    @Keep
+    public boolean isSecurityTypeEnabled(@SecurityType int securityType) {
+        for (SecurityParams p : mSecurityParamsList) {
+            if (p.isSecurityType(securityType) && p.isEnabled()) {
                 return true;
             }
         }

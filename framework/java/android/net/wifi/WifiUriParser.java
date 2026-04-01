@@ -135,6 +135,7 @@ public class WifiUriParser {
         String password = null;
         String hiddenSsidString = null;
         String transitionDisabledValue = null;
+        String publicKey = null;
         if (mockableIsFlagNewUriParsingForEscapeCharacterEnabled()) {
             String wifiQr = uri.substring(PREFIX_ZXING_WIFI_NETWORK_CONFIG.length());
             Pair<Integer, String> zxingUriElement;
@@ -165,6 +166,10 @@ public class WifiUriParser {
                     transitionDisabledValue = zxingUriElement.second;
                     start = start + zxingUriElement.first
                             + PREFIX_ZXING_TRANSITION_DISABLE.length();
+                } else if (value.startsWith(PREFIX_DPP_PUBLIC_KEY)) {
+                    zxingUriElement = getZxingUriElement(value, PREFIX_DPP_PUBLIC_KEY);
+                    publicKey = zxingUriElement.second;
+                    start = start + zxingUriElement.first + PREFIX_DPP_PUBLIC_KEY.length();
                 } else if (Character.isWhitespace(ch) || ch == URI_DELIMITER_CHAR) {
                     // Skip space and DELIMITER_QR_CODE in URI when detecting prefix
                     start++;
@@ -184,6 +189,7 @@ public class WifiUriParser {
             hiddenSsidString = getValueOrNull(keyValueList, PREFIX_ZXING_HIDDEN_SSID);
             transitionDisabledValue = getValueOrNull(keyValueList,
                     PREFIX_ZXING_TRANSITION_DISABLE);
+            publicKey = getValueOrNull(keyValueList, PREFIX_DPP_PUBLIC_KEY);
 
             // "\", ";", "," and ":" are escaped with a backslash "\", should remove at first
             security = removeBackSlash(security);
@@ -191,11 +197,40 @@ public class WifiUriParser {
             password = removeBackSlash(password);
         }
         boolean hiddenSsid = "true".equalsIgnoreCase(hiddenSsidString);
-        boolean isTransitionDisabled = "1".equalsIgnoreCase(transitionDisabledValue);
+        // R: * (HEXDIG) and the value is bitmap fields as described in
+        // WIFI URI and Transition Disable sections, WPA3 Specification.
+        boolean isWpa3PersonalOnly = false; // SAE shall be used. No PSK allowed.
+        boolean isSaePkOnly = false; // SAE-PK shall be used.
+        //boolean isWpa3EnterpriseSha256Only = false; // SHA-256 shall be used. No SHA-1 allowed.
+        boolean isWifiEnhancedOpenOnly = false; // OWE shall be used. No Open allowed.
+        if (transitionDisabledValue != null) {
+            try {
+                // * (HEXDIG) is expected where [0-9A-F]* allowed but [a-f] accepted for simplicity.
+                final int transitionDisableBitmap = Integer.parseUnsignedInt(transitionDisabledValue, 16);
+                if ((transitionDisableBitmap & 0x01) != 0) {
+                    isWpa3PersonalOnly = true;
+                }
+                if ((transitionDisableBitmap & 0x02) != 0) {
+                    isSaePkOnly = true;
+                }
+                //if ((transitionDisableBitmap & 0x04) != 0) {
+                //    isWpa3EnterpriseSha256Only = true;
+                //}
+                if ((transitionDisableBitmap & 0x08) != 0) {
+                    isWifiEnhancedOpenOnly = true;
+                }
+            } catch (NumberFormatException e) {
+                Log.e(TAG, "R: does not followed by HEXDIG but " + transitionDisabledValue, e);
+            }
+        }
         if (isValidConfig(security, ssid, password)) {
             config = generateWifiConfiguration(
                         security, ssid, password, hiddenSsid, WifiConfiguration.INVALID_NETWORK_ID,
-                        isTransitionDisabled);
+                        publicKey,
+                        isWpa3PersonalOnly,
+                        isSaePkOnly,
+                        //isWpa3EnterpriseSha256Only,
+                        isWifiEnhancedOpenOnly);
         }
 
         if (config == null) {
@@ -327,19 +362,27 @@ public class WifiUriParser {
      */
     private static WifiConfiguration generateWifiConfiguration(
             String security, String ssid, String preSharedKey, boolean hiddenSsid, int networkId,
-            boolean isTransitionDisabled) {
+            String publicKey,
+            boolean isWpa3PersonalOnly,
+            boolean isSaePkOnly,
+            //boolean isWpa3EnterpriseSha256Only,
+            boolean isWifiEnhancedOpenOnly) {
         final WifiConfiguration wifiConfiguration = new WifiConfiguration();
         wifiConfiguration.SSID = addQuotation(ssid);
         wifiConfiguration.hiddenSSID = hiddenSsid;
         wifiConfiguration.networkId = networkId;
 
         if (TextUtils.isEmpty(security) || SECURITY_NO_PASSWORD.equals(security)) {
-            wifiConfiguration.setSecurityParams(
-                    Arrays.asList(
-                            SecurityParams.createSecurityParamsBySecurityType(
-                                    WifiConfiguration.SECURITY_TYPE_OPEN),
-                            SecurityParams.createSecurityParamsBySecurityType(
-                                    WifiConfiguration.SECURITY_TYPE_OWE)));
+            if (isWifiEnhancedOpenOnly) {
+                wifiConfiguration.setSecurityParams(WifiConfiguration.SECURITY_TYPE_OWE);
+            } else {
+                wifiConfiguration.setSecurityParams(
+                        Arrays.asList(
+                                SecurityParams.createSecurityParamsBySecurityType(
+                                        WifiConfiguration.SECURITY_TYPE_OPEN),
+                                SecurityParams.createSecurityParamsBySecurityType(
+                                        WifiConfiguration.SECURITY_TYPE_OWE)));
+            }
             return wifiConfiguration;
         }
 
@@ -355,27 +398,42 @@ public class WifiUriParser {
                 wifiConfiguration.wepKeys[0] = addQuotation(preSharedKey);
             }
         } else if (security.startsWith(SECURITY_WPA_PSK)) {
-            List<SecurityParams> securityParamsList = new ArrayList<>();
-            SecurityParams scannedSecurityParam = SecurityParams.createSecurityParamsBySecurityType(
-                            WifiConfiguration.SECURITY_TYPE_PSK);
-            securityParamsList.add(scannedSecurityParam);
-            if (isTransitionDisabled) {
-                scannedSecurityParam.setEnabled(false);
-                securityParamsList.add(
-                        SecurityParams.createSecurityParamsBySecurityType(
-                                WifiConfiguration.SECURITY_TYPE_SAE));
+            boolean wpa3only = isWpa3PersonalOnly || "WPA3".equals(security);
+            if (wpa3only) {
+                wifiConfiguration.setSecurityParams(WifiConfiguration.SECURITY_TYPE_SAE);
+            } else {
+                wifiConfiguration.setSecurityParams(
+                       Arrays.asList(
+                                SecurityParams.createSecurityParamsBySecurityType(
+                                        WifiConfiguration.SECURITY_TYPE_PSK),
+                                SecurityParams.createSecurityParamsBySecurityType(
+                                        WifiConfiguration.SECURITY_TYPE_SAE)));
             }
-            wifiConfiguration.setSecurityParams(securityParamsList);
 
-            if (preSharedKey.matches("[0-9A-Fa-f]{64}")) {
+            if (preSharedKey.length() == 0) {
+                Log.e(TAG, "no preSharedKey: " + wifiConfiguration);
+            } else if (preSharedKey.matches("[0-9A-Fa-f]{64}") && !wpa3only) {
                 wifiConfiguration.preSharedKey = preSharedKey;
             } else {
                 wifiConfiguration.preSharedKey = addQuotation(preSharedKey);
+            }
+
+            if (!TextUtils.isEmpty(publicKey)) {
+                //TODO: Set publicKey to wifiConfiguration once API is available to use.
+                if (isSaePkOnly) {
+                    wifiConfiguration.enableSaePkOnlyMode(true);
+                }
             }
         } else if (security.startsWith(SECURITY_SAE)) {
             wifiConfiguration.setSecurityParams(WifiConfiguration.SECURITY_TYPE_SAE);
             if (preSharedKey.length() != 0) {
                 wifiConfiguration.preSharedKey = addQuotation(preSharedKey);
+            }
+            if (!TextUtils.isEmpty(publicKey)) {
+                //TODO: Set publicKey to wifiConfiguration once API is available to use.
+                if (isSaePkOnly) {
+                    wifiConfiguration.enableSaePkOnlyMode(true);
+                }
             }
         } else if (security.startsWith(SECURITY_ADB)) {
             Log.i(TAG, "Security key: ADB, the ssid and passphrase should NOT add quotation");
