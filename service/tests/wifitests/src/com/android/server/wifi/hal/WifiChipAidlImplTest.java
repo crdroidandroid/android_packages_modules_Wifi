@@ -22,6 +22,7 @@ import static com.android.server.wifi.TestUtil.createCapabilityBitset;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertNotNull;
+import static org.junit.Assert.assertNull;
 import static org.junit.Assert.assertTrue;
 import static org.mockito.ArgumentMatchers.anyInt;
 import static org.mockito.ArgumentMatchers.eq;
@@ -29,8 +30,9 @@ import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.inOrder;
 import static org.mockito.Mockito.lenient;
 import static org.mockito.Mockito.never;
-import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.reset;
+import static org.mockito.Mockito.times;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import android.content.Context;
@@ -46,7 +48,9 @@ import android.hardware.wifi.WifiDebugRingBufferFlags;
 import android.hardware.wifi.WifiDebugRingBufferStatus;
 import android.hardware.wifi.WifiDebugRingBufferVerboseLevel;
 import android.hardware.wifi.WifiStatusCode;
+import android.net.wifi.WifiAvailableChannel;
 import android.net.wifi.WifiManager;
+import android.net.wifi.WifiScanner;
 import android.os.RemoteException;
 import android.os.ServiceSpecificException;
 
@@ -113,6 +117,42 @@ public class WifiChipAidlImplTest extends WifiBaseTest {
                 .when(mIWifiChipMock).getId();
         assertEquals(-1, mDut.getId());
         verify(mIWifiChipMock).getId();
+    }
+
+    @Test
+    public void testGetUsableChannelsNotSupportedIsCached() throws Exception {
+        doThrow(new ServiceSpecificException(WifiStatusCode.ERROR_NOT_SUPPORTED))
+                .when(mIWifiChipMock).getUsableChannels(anyInt(), anyInt(), anyInt());
+
+        assertNull(mDut.getUsableChannels(
+                WifiScanner.WIFI_BAND_24_GHZ,
+                WifiAvailableChannel.OP_MODE_STA,
+                WifiAvailableChannel.FILTER_REGULATORY));
+        assertNull(mDut.getUsableChannels(
+                WifiScanner.WIFI_BAND_24_GHZ,
+                WifiAvailableChannel.OP_MODE_STA,
+                WifiAvailableChannel.FILTER_REGULATORY));
+
+        verify(mIWifiChipMock, times(1))
+                .getUsableChannels(anyInt(), anyInt(), anyInt());
+    }
+
+    @Test
+    public void testGetUsableChannelsTransientErrorIsNotCached() throws Exception {
+        doThrow(new ServiceSpecificException(WifiStatusCode.ERROR_BUSY))
+                .when(mIWifiChipMock).getUsableChannels(anyInt(), anyInt(), anyInt());
+
+        assertNull(mDut.getUsableChannels(
+                WifiScanner.WIFI_BAND_24_GHZ,
+                WifiAvailableChannel.OP_MODE_STA,
+                WifiAvailableChannel.FILTER_REGULATORY));
+        assertNull(mDut.getUsableChannels(
+                WifiScanner.WIFI_BAND_24_GHZ,
+                WifiAvailableChannel.OP_MODE_STA,
+                WifiAvailableChannel.FILTER_REGULATORY));
+
+        verify(mIWifiChipMock, times(2))
+                .getUsableChannels(anyInt(), anyInt(), anyInt());
     }
 
     /**

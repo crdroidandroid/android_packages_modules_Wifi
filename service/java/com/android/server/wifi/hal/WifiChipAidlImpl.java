@@ -95,6 +95,7 @@ public class WifiChipAidlImpl implements IWifiChip {
     private Context mContext;
     private SsidTranslator mSsidTranslator;
     private long mHalFeatureSet;
+    private boolean mGetUsableChannelsSupported = true;
 
     public WifiChipAidlImpl(@NonNull android.hardware.wifi.IWifiChip chip,
             @NonNull Context context, @NonNull SsidTranslator ssidTranslator) {
@@ -713,6 +714,7 @@ public class WifiChipAidlImpl implements IWifiChip {
         synchronized (mLock) {
             try {
                 if (!checkIfaceAndLogFailure(methodStr)) return null;
+                if (!mGetUsableChannelsSupported) return null;
                 WifiUsableChannel[] halChannels = mWifiChip.getUsableChannels(
                         frameworkToHalWifiBand(band),
                         frameworkToHalIfaceMode(mode),
@@ -727,7 +729,12 @@ public class WifiChipAidlImpl implements IWifiChip {
             } catch (RemoteException e) {
                 handleRemoteException(e, methodStr);
             } catch (ServiceSpecificException e) {
-                handleServiceSpecificException(e, methodStr);
+                if (e.errorCode == WifiStatusCode.ERROR_NOT_SUPPORTED) {
+                    Log.w(TAG, methodStr + " is not supported by the HAL");
+                    mGetUsableChannelsSupported = false;
+                } else {
+                    handleServiceSpecificException(e, methodStr);
+                }
             } catch (IllegalArgumentException e) {
                 handleIllegalArgumentException(e, methodStr);
             }
